@@ -2,6 +2,10 @@
 
 > 코딩 0줄. 채팅으로만 합니다.
 
+> 🔒 **보안 약속**: 김태대리(Claude)는 사장님의 API 키를 절대 보지 않습니다.
+> 키는 사장님이 직접 `.env` 파일에 입력하시며, AI는 발급 가이드와 검증·실행만 도와드립니다.
+> → 자세히: [SECURITY.md](SECURITY.md)
+
 ---
 
 ## 1️⃣ Claude Code 설치 (1분, 한 번만)
@@ -85,8 +89,11 @@ github.com/kimtaedaeri/naver-powerlink-bidding 다운로드해서 데모 보여�
 ## 🔒 안전한가요?
 
 - 사장님의 API 키는 **사장님 컴퓨터의 숨김 파일(`.env`)에만** 저장됩니다
-- 외부 서버에 전송 X (Claude를 통해 입력하므로 Anthropic 서버는 잠깐 경유)
+- Anthropic 서버에 키 **전송 0%** — 사장님이 직접 `.env` 편집, Claude은 키 모름
 - 영상이나 화면 공유 시 키가 보이지 않게 편집하세요
+- **공식 출처만 신뢰**: github.com/kimtaedaeri/naver-powerlink-bidding
+- 사칭 사이트 발견 시 신고: kimtaedaeri@gmail.com
+- 자세한 위협 모델: [SECURITY.md](SECURITY.md)
 
 ## 💰 비용
 

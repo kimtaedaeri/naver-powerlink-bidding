@@ -27,7 +27,8 @@ def main() -> int:
         creds = require_credentials()
     except ValueError as e:
         print(f"❌ {e}")
-        print("   → .env 를 다시 작성하거나 `prompts/02-api-key-naver.md` 안내를 따라주세요")
+        print("   → 사장님이 직접 `.env` 를 편집하셔야 합니다.")
+        print("   → 가이드: prompts/02b-edit-env.md")
         return 1
 
     print("🔐 네이버 검색광고 API 키 검증 중...")
