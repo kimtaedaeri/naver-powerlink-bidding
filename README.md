@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-0.2.0-green.svg)](pyproject.toml)
+[![Version](https://img.shields.io/badge/version-0.3.0-green.svg)](pyproject.toml)
 
 > 🎬 **[김태대리 채널](https://youtube.com/@kimtaedaeri)의 첫 오픈소스**입니다.
 > 1인 사업자 사장님 대신 일하는 코드 — 영원히 무료, AI까지 한 번에.
@@ -13,7 +13,7 @@
 > 키는 사장님이 직접 `.env` 파일에 입력하시며, AI는 발급 가이드와 검증·실행만 도와드립니다.
 > 자세히: [SECURITY.md](SECURITY.md)
 
-**v0.2 — 네이버 API 연동 + 대화형 setup + dry-run/live 모드 지원.**
+**v0.3 — 자동입찰 + 비효율 검색어 분석·부정 키워드 자동 발굴 + Chat-First UX.**
 
 ---
 
@@ -66,9 +66,13 @@
 ```bash
 git clone https://github.com/kimtaedaeri/naver-powerlink-bidding
 cd naver-powerlink-bidding
+python3 -m venv .venv && source .venv/bin/activate   # 가상환경 권장
 pip install -e .
 python -m powerlink_pilot run --sample
 ```
+
+> 💡 **macOS 사용자**: 시스템 Python 보호(PEP 668)로 `.venv` 가상환경이 필수입니다.
+> 윈도우는 `.venv\Scripts\activate` 사용.
 
 내장 샘플 키워드 3개로 룰베이스 입찰 자동화를 시뮬레이션합니다.
 
@@ -188,6 +192,14 @@ python -m powerlink_pilot run --live --yes       # 자동화용
 python -m powerlink_pilot history                # 최근 20건
 python -m powerlink_pilot history --mode live    # live 만
 python -m powerlink_pilot history --reset        # 모든 기록 초기화
+
+# 검색어 분석 + 부정 키워드 (v0.3 신규)
+python -m powerlink_pilot fetch-stats             # 광고 데이터 받기 (지난 7일, 1~3분 소요)
+python -m powerlink_pilot fetch-stats --days 30 --type all   # 30일 + 시간대까지
+python -m powerlink_pilot analyze                 # 비효율 검색어 추천 (변경 X)
+python -m powerlink_pilot analyze --sample        # 데모 모드 (API 키 불필요)
+python -m powerlink_pilot analyze --apply         # 사장님 y 확인 후 부정 키워드 등록
+python -m powerlink_pilot analyze --apply --yes   # 자동화용 (확인 스킵)
 ```
 
 ### 키워드별 정책 빠르게 조정하기
@@ -288,9 +300,9 @@ keywords:
 |---|---|
 | ✅ v0.1 | 샘플 모드 (시뮬레이션) |
 | ✅ v0.2 | 네이버 API 연동, setup 마법사, dry-run/live |
-| 🔜 v0.3 | Claude AI 광고 카피 자동 생성·A/B |
-| 🔜 v0.4 | 검색 쿼리 분석 → 부정 키워드 자동 발굴 |
-| 🔜 v0.5 | 시간대별 룰 자동 튜닝 |
+| ✅ v0.3 | 검색어 분석 → 부정 키워드 추천·자동 등록 + Chat-First UX + 보안 우선 셋업 |
+| 🔜 v0.4 | 시간대별 룰 자동 튜닝 |
+| 🔜 v1.0 | 단위 테스트·CI·안전 가드 종합 (production-ready) |
 
 ---
 
@@ -304,9 +316,9 @@ keywords:
 
 | 항목 | 월 비용 |
 |---|---|
+| 김태대리 도구 (오픈소스) | ₩0 |
 | GitHub Actions cron (셀프호스팅) | ₩0 |
 | 네이버 광고 API | ₩0 |
-| Anthropic API (v0.3+) | 약 ₩2,000~5,000 |
 
 본인 명의 네이버 광고주 계정만 있으면 추가 비용 0원으로 운영 가능합니다.
 

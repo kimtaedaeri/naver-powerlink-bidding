@@ -43,3 +43,12 @@ keywords:
     max_bid: 8000
     min_bid: 2000
     step: 800
+
+# 검색어 분석 임계치 (v0.3 신규, 선택)
+# 명시 안 하면 합리적 기본값. 사장님 광고 규모에 맞게 조정 가능.
+# analyze:
+#   no_clicks_min_impressions: 50      # 노출 X회 이상 + 클릭 0 → "비효율" (기본 50)
+#   no_conversion_min_clicks: 5        # 클릭 X회 이상 + 전환 0 → "비효율" (기본 5)
+#   low_ctr_min_impressions: 30        # CTR 분석 최소 노출 (기본 30)
+#   low_ctr_ratio_vs_avg: 0.3          # 평균 CTR × 이 비율 미만이면 "비효율" (기본 0.3)
+#   exclude_own_keywords: true         # 등록 키워드와 동일 검색어는 제외 (기본 true)

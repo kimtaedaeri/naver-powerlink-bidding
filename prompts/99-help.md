@@ -23,7 +23,8 @@ A. 설치할 때 ("다운로드해줘"가 안 됨)
 B. API 키 발급할 때
 C. 셋업할 때 (광고 계정 연결)
 D. 입찰 돌릴 때
-E. 모르겠어요 / 다른 거예요
+E. 검색어 분석할 때 (fetch-stats, analyze)
+F. 모르겠어요 / 다른 거예요
 ```
 
 ### Step 2 — 환경 체크 (A인 경우)
@@ -68,6 +69,20 @@ python -m powerlink_pilot run --dry-run
 - "Estimate 호출 실패" → 잠시 후 재시도 (rate limit)
 - "PUT 실패" → 광고그룹 권한 확인
 
+### Step 5b — 검색어 분석 체크 (E인 경우)
+
+```bash
+python -m powerlink_pilot analyze --sample      # 일단 데모 모드로 동작 확인
+```
+
+- **분석 안 됨 (`run --sample` 도 안 됨)** → 환경 문제 (Step 2 환경 체크로)
+- **"분석할 검색어 데이터가 없습니다"** → `python -m powerlink_pilot fetch-stats` 먼저 실행
+- **`fetch-stats` 가 5분 이상 멈춤** → 광고 데이터 양 많음. 그대로 두거나, `Ctrl+C` 후 `--days 3` 으로 단축
+- **`fetch-stats` 가 "데이터 없음" 만 반복** → 사장님 광고가 그 기간 안 돌았거나 광고 노출 0. 더 긴 기간 시도 (`--days 30`)
+- **"보고서 생성 실패 (status=FAILED)"** → 네이버 서버 일시 문제. 30분 후 재시도
+- **"광고그룹 조회 실패"** → 키 만료. Step 3 키 체크
+- **`analyze --apply` 가 "권한 없음" 에러** → 광고 계정 권한 부족. 네이버 콘솔에서 권한 확인
+
 ### Step 6 — 그래도 막히면
 
 ```
@@ -84,15 +99,18 @@ python -m powerlink_pilot run --dry-run
 
 ---
 
-## 🚨 자주 발생하는 막힘 5가지
+## 🚨 자주 발생하는 막힘 8가지
 
 | 증상 | 원인 | 해결 |
 |---|---|---|
-| `ModuleNotFoundError: powerlink_pilot` | venv 활성화 안 됨 | `.venv/bin/python -m powerlink_pilot ...` |
-| `자격증명 누락` | `.env` 없음 또는 키 빈 값 | setup 재실행 |
+| `ModuleNotFoundError: powerlink_pilot` | venv 활성화 안 됨 또는 install -e 안 함 | `.venv/bin/python -m powerlink_pilot ...` 또는 `pip install -e .` 재실행 |
+| `error: externally-managed-environment` | macOS 시스템 pip 차단 | `.venv` 가상환경 필수 — README 30초 체험 참고 |
+| `자격증명 누락` | `.env` 없음 또는 키 빈 값 | `prompts/02b-edit-env.md` 가이드 |
 | `[401] auth failed` | API 키 만료·오타 | 네이버 콘솔에서 재발급 |
 | `매칭 안 된 키워드` | yaml 이름 ≠ 네이버 계정 키워드 | yaml에서 정확한 이름으로 수정 |
 | `Estimate API 호출 실패 [429]` | 호출 빈도 초과 | 30분 후 재시도 |
+| `분석할 검색어 데이터가 없습니다` | 한 번도 fetch-stats 안 함 | `python -m powerlink_pilot fetch-stats` |
+| `.env` 한글 깨짐 또는 키 미인식 | 윈도우 메모장 인코딩 (UTF-16 BOM) | VS Code 또는 메모장에서 "UTF-8" 선택 저장 |
 
 ---
 

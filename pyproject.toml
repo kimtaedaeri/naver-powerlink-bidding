@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "powerlink-pilot"
-version = "0.2.0"
-description = "Open-source Naver Search Ads auto-bidding tool — rule-based now, AI-driven later"
+version = "0.3.0"
+description = "Open-source Naver Search Ads auto-bidding + search query analyzer + negative keyword finder"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }

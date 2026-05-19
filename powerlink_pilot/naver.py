@@ -193,6 +193,120 @@ class NaverAdsClient:
             return result.get("estimate") or result.get("estimates") or []
         return result or []
 
+    # ─── restricted keywords (부정 키워드) ───────────────────────────────
+
+    def list_restricted_keywords(self, adgroup_id: str) -> list[dict]:
+        """광고그룹의 부정 키워드 목록.
+
+        Naver 응답 항목 예시:
+            {"nccAdgroupId": "...", "keyword": "사기", "type": "KEYWORD_PLUS_RESTRICT"}
+
+        type 의미:
+          - KEYWORD: 일반 부정 키워드
+          - KEYWORD_PLUS_RESTRICT: 확장 검색 제외 키워드
+        """
+        result = self._request(
+            "GET",
+            f"/ncc/adgroups/{adgroup_id}/restricted-keywords",
+        )
+        return result if isinstance(result, list) else []
+
+    def add_restricted_keywords(
+        self,
+        adgroup_id: str,
+        keywords: list[str],
+        *,
+        keyword_type: str = "KEYWORD_PLUS_RESTRICT",
+    ) -> list[dict]:
+        """광고그룹에 부정 키워드 일괄 등록.
+
+        keywords: 등록할 검색어/키워드 리스트 (중복 체크는 호출자가 미리)
+        keyword_type:
+          - "KEYWORD_PLUS_RESTRICT" (기본) — 확장 검색에서 차단
+          - "KEYWORD" — 일반 부정
+
+        반환: 등록 결과 객체 리스트
+        """
+        if not keywords:
+            return []
+        body = [
+            {
+                "nccAdgroupId": adgroup_id,
+                "keyword": kw,
+                "type": keyword_type,
+            }
+            for kw in keywords
+        ]
+        result = self._request(
+            "POST",
+            f"/ncc/adgroups/{adgroup_id}/restricted-keywords",
+            json_body=body,
+        )
+        if isinstance(result, list):
+            return result
+        if isinstance(result, dict):
+            return [result]
+        return []
+
+    # ─── stat reports (async: POST → polling → download) ────────────────
+
+    def create_stat_report(self, report_type: str, stat_date: str) -> dict:
+        """비동기 보고서 생성 요청.
+
+        report_type: 'AD_DETAIL' (검색어), 'AD' (키워드 집계), 'TIME' (시간대별) 등
+        stat_date: 단일 일자 'YYYY-MM-DD'
+
+        반환: {"reportJobId": "...", "status": "REGIST"} 형식
+        """
+        body = {"reportTp": report_type, "statDt": stat_date}
+        result = self._request("POST", "/stat-reports", json_body=body)
+        if not isinstance(result, dict):
+            raise NaverApiError(0, f"예상치 못한 응답: {result}")
+        return result
+
+    def get_stat_report(self, report_job_id: str) -> dict:
+        """보고서 상태·다운로드 URL 조회.
+
+        반환 예: {
+            "reportJobId": "...",
+            "status": "REGIST" | "RUNNING" | "BUILT" | "NONE" | "FAILED",
+            "downloadUrl": "...",  (status == BUILT 일 때만)
+            ...
+        }
+        """
+        result = self._request("GET", f"/stat-reports/{report_job_id}")
+        if not isinstance(result, dict):
+            raise NaverApiError(0, f"예상치 못한 응답: {result}")
+        return result
+
+    def download_stat_report(self, download_url: str) -> bytes:
+        """보고서 파일 다운로드 (TSV/CSV 바이너리 반환).
+
+        Naver 의 downloadUrl 은 보통 별도 storage 호스트의 서명된 URL.
+        같은 API 도메인이면 인증 헤더를 추가, 아니면 단순 GET.
+        """
+        if not download_url:
+            raise ValueError("downloadUrl 이 비어있습니다")
+
+        from urllib.parse import urlparse
+
+        parsed = urlparse(download_url)
+        headers: dict[str, str] = {}
+        if parsed.netloc.endswith("searchad.naver.com"):
+            headers = self._headers("GET", parsed.path or "/")
+
+        try:
+            response = requests.get(
+                download_url, headers=headers, timeout=self.timeout
+            )
+        except requests.RequestException as e:
+            raise NaverApiError(0, str(e), hint="네트워크 또는 다운로드 URL 만료") from e
+
+        if not 200 <= response.status_code < 300:
+            raise NaverApiError(response.status_code, response.text[:200])
+
+        return response.content
+
     # ─── update ──────────────────────────────────────────────────────────
 
     def update_keyword_bid(self, keyword_data: dict, new_bid: int) -> dict:

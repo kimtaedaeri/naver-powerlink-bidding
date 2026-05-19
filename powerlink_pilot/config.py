@@ -52,6 +52,7 @@ class Config:
     adgroups: list[AdgroupRef] = field(default_factory=list)
     keywords: list[KeywordPolicy] = field(default_factory=list)
     defaults: Defaults = field(default_factory=Defaults)
+    analyze_overrides: dict = field(default_factory=dict)  # yaml 의 analyze 섹션 (raw)
 
 
 # ─── env / credentials ──────────────────────────────────────────────────
@@ -160,7 +161,31 @@ def load_config(yaml_path: Path = CONFIG_PATH_DEFAULT) -> Config:
             )
         )
 
-    return Config(adgroups=adgroups, keywords=keywords, defaults=defaults)
+    # analyze 섹션 (선택) — 사장님이 임계치를 yaml 로 조정할 수 있음
+    analyze_section = data.get("analyze") or {}
+    if not isinstance(analyze_section, dict):
+        raise ValueError(f"{yaml_path}: 'analyze' 섹션은 매핑이어야 합니다")
+
+    return Config(
+        adgroups=adgroups,
+        keywords=keywords,
+        defaults=defaults,
+        analyze_overrides=analyze_section,
+    )
+
+
+def get_analyze_thresholds(config: Config):
+    """Config 의 analyze_overrides 를 analyzer.AnalyzeThresholds 로 변환.
+
+    yaml 에 명시 안 된 필드는 기본값 유지. 순환 import 방지로 함수 내에서 import.
+    """
+    from .analyzer import AnalyzeThresholds
+
+    base = AnalyzeThresholds()
+    for key, val in (config.analyze_overrides or {}).items():
+        if hasattr(base, key):
+            setattr(base, key, val)
+    return base
 
 
 def policies_by_name(config: Config) -> dict[str, KeywordPolicy]:

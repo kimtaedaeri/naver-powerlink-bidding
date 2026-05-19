@@ -31,13 +31,19 @@
 cd ~/Documents/kimtaedaeri/naver-powerlink-bidding
 ```
 
-### 3️⃣ `.env` 파일 만들기 (없으면)
+### 3️⃣ `.env` 파일 만들기 (없으면만)
+
+⚠️ **이미 `.env` 파일이 있으시면 이 단계 건너뛰세요.** 덮어쓰면 기존 키 날아갑니다.
 
 ```bash
-cp .env.example .env
+[ -f .env ] || cp .env.example .env    # 없을 때만 복사
 ```
 
-> 이미 만들어져 있으면 "이미 있다"는 메시지가 뜹니다. 무시하셔도 OK.
+또는 한 줄씩:
+```bash
+ls .env                                 # 있으면 표시됨, 없으면 'No such file'
+cp .env.example .env                    # 위가 'No such file' 였을 때만
+```
 
 ### 4️⃣ TextEdit 으로 열기
 
@@ -94,10 +100,12 @@ NAVER_CUSTOMER_ID=1234567
 cd %USERPROFILE%\Documents\kimtaedaeri\naver-powerlink-bidding
 ```
 
-### 3️⃣ `.env` 파일 만들기
+### 3️⃣ `.env` 파일 만들기 (없으면만)
+
+⚠️ **이미 `.env` 가 있으시면 이 단계 건너뛰세요.**
 
 ```cmd
-copy .env.example .env
+if not exist .env copy .env.example .env
 ```
 
 ### 4️⃣ 메모장으로 열기
@@ -108,7 +116,14 @@ notepad .env
 
 ### 5️⃣ 키 3개 붙여넣기 + 저장
 
-(Mac 5단계와 동일한 형식으로 키 입력 → Ctrl+S → 닫기)
+(Mac 5단계와 동일한 형식으로 키 입력)
+
+⚠️ **윈도우 메모장 저장 시 주의 — 인코딩 반드시 `UTF-8` 선택**
+
+- 메모장 아래 "다른 이름으로 저장" → 인코딩 드롭다운 → **UTF-8** 선택
+- 기본값(ANSI 또는 UTF-16)로 저장하면 한국어 깨지거나 키 인식 실패
+- 더 안전한 방법: 메모장 대신 **VS Code** 또는 **Notepad++** 사용
+- VS Code 사용 시: `code .env` 명령으로 열기 (자동 UTF-8)
 
 ---
 

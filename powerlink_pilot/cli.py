@@ -372,6 +372,192 @@ def cmd_history(args: argparse.Namespace) -> int:
     return 0
 
 
+# ─── fetch-stats command ──────────────────────────────────────────────
+
+
+def cmd_fetch_stats(args: argparse.Namespace) -> int:
+    """네이버 stat-reports 비동기 보고서 다운로드 → DB 저장."""
+    init_db()
+
+    from .config import require_credentials
+    from .naver import NaverAdsClient
+    from .reports import fetch_search_query_report, fetch_hourly_report, last_n_days
+    from .db import save_search_queries, save_hourly_stats
+
+    try:
+        creds = require_credentials()
+    except ValueError as e:
+        print(f"❌ {e}")
+        return 1
+
+    client = NaverAdsClient(creds)
+    dates = last_n_days(args.days)
+    print(f"📅 기간: {dates[-1]} ~ {dates[0]} ({args.days}일)")
+
+    types: list[str] = []
+    if args.type in ("search", "all"):
+        types.append("search")
+    if args.type in ("hourly", "all"):
+        types.append("hourly")
+
+    def progress(msg: str) -> None:
+        print(msg)
+
+    total_days = len(dates)
+    overall_ok = True
+
+    if "search" in types:
+        print()
+        print("━━━ 검색어 보고서 (AD_DETAIL) ━━━")
+        rows = fetch_search_query_report(client, dates, progress=progress)
+        got_dates = {r.stat_date for r in rows}
+        missing = total_days - len(got_dates)
+        if rows:
+            n = save_search_queries(rows)
+            print(f"💾 저장: {n}행 — 데이터 받은 일자 {len(got_dates)}/{total_days}일"
+                  + (f", 빈 데이터 {missing}일" if missing else ""))
+        else:
+            print(f"⚠️  검색어 데이터 0건 — 요청한 {total_days}일 모두 빈 데이터")
+            print("    원인 후보: 광고 노출이 적거나, 광고 안 돌아간 기간")
+            overall_ok = False
+
+    if "hourly" in types:
+        print()
+        print("━━━ 시간대 보고서 (TIME) ━━━")
+        rows = fetch_hourly_report(client, dates, progress=progress)
+        got_dates = {r.stat_date for r in rows}
+        missing = total_days - len(got_dates)
+        if rows:
+            n = save_hourly_stats(rows)
+            print(f"💾 저장: {n}행 — 데이터 받은 일자 {len(got_dates)}/{total_days}일"
+                  + (f", 빈 데이터 {missing}일" if missing else ""))
+        else:
+            print(f"⚠️  시간대 데이터 0건 — 요청한 {total_days}일 모두 빈 데이터")
+            overall_ok = False
+
+    print()
+    if overall_ok:
+        print("✅ 완료. 다음 단계:")
+        print("   python -m powerlink_pilot analyze        # 검색어 분석")
+    else:
+        print("⚠️  일부 또는 전체 데이터를 받지 못했습니다.")
+        print("   - 광고가 돌아간 기간이 짧으면 --days 30 으로 늘려서 재시도")
+        print("   - 그래도 빈 데이터면 광고 노출이 너무 적은 상태")
+    return 0 if overall_ok else 1
+
+
+# ─── analyze command ──────────────────────────────────────────────────
+
+
+def cmd_analyze(args: argparse.Namespace) -> int:
+    """검색어 데이터 분석 → 비효율 검색어 추천 → (선택) 등록."""
+    init_db()
+
+    from .analyzer import (
+        AnalyzeThresholds,
+        analyze_queries,
+        format_recommendations_korean,
+        generate_sample_queries,
+    )
+
+    # yaml 에 analyze 섹션 있으면 사장님 설정 반영, 없으면 기본값
+    thresholds = AnalyzeThresholds()
+    used_yaml_overrides = False
+    if not args.sample:
+        try:
+            from .config import load_config, get_analyze_thresholds
+
+            cfg = load_config()
+            if cfg.analyze_overrides:
+                thresholds = get_analyze_thresholds(cfg)
+                used_yaml_overrides = True
+        except (FileNotFoundError, ValueError):
+            pass  # yaml 없거나 형식 문제면 기본값 사용
+
+    if used_yaml_overrides:
+        print(f"⚙️  keywords.yaml 의 analyze 임계치 적용 (필드 {len(cfg.analyze_overrides)}개)")
+    elif not args.sample:
+        print("⚙️  분석 임계치 기본값 사용")
+        print("   조정하시려면 keywords.yaml 에 analyze: 섹션 추가 (examples 참고)")
+
+    # 데이터 소스 결정
+    if args.sample:
+        print("🎬 sample 모드 — 합성 데이터로 데모")
+        rows = generate_sample_queries()
+    else:
+        from .db import get_search_queries
+
+        rows = get_search_queries(
+            since_date=args.since,
+            until_date=args.until,
+            adgroup_id=args.adgroup,
+        )
+        if not rows:
+            print("⚠️  분석할 검색어 데이터가 없습니다.")
+            print("   먼저 데이터를 받아야 합니다:")
+            print("     python -m powerlink_pilot fetch-stats")
+            return 1
+
+    print(f"📊 분석 대상: {len(rows)}행")
+    recs = analyze_queries(rows, thresholds=thresholds)
+
+    print()
+    print(format_recommendations_korean(recs))
+
+    if not recs:
+        return 0
+
+    # apply 모드
+    if args.apply:
+        if args.sample:
+            print()
+            print("⚠️  sample 모드에서는 실제 API 호출하지 않습니다.")
+            return 0
+
+        from .config import require_credentials
+        from .naver import NaverAdsClient
+        from .negative_kw import (
+            build_plans,
+            format_plans_korean,
+            format_results_korean,
+            register_plans,
+        )
+
+        try:
+            creds = require_credentials()
+        except ValueError as e:
+            print(f"❌ {e}")
+            return 1
+
+        client = NaverAdsClient(creds)
+        print()
+        print("📡 기존 부정 키워드 조회 중 (중복 방지)...")
+        plans = build_plans(client, recs)
+
+        print()
+        print(format_plans_korean(plans))
+
+        if not any(p.new_queries for p in plans):
+            print("등록할 신규 부정 키워드가 없어요.")
+            return 0
+
+        if not args.yes:
+            confirm = input("\n정말로 등록하시겠어요? (y/N): ").strip().lower()
+            if confirm != "y":
+                print("취소되었습니다.")
+                return 0
+
+        print()
+        results = register_plans(client, plans, dry_run=False, progress=lambda m: print("  " + m))
+        print()
+        print(format_results_korean(results))
+        return 0
+
+    print()
+    print("→ 등록하시려면: python -m powerlink_pilot analyze --apply")
+    return 0
+
+
 # ─── parser ────────────────────────────────────────────────────────────
 
 
@@ -444,6 +630,34 @@ def main() -> None:
     )
     p_hist.add_argument("--reset", action="store_true", help="모든 기록 삭제")
     p_hist.set_defaults(func=cmd_history)
+
+    # fetch-stats
+    p_fetch = subparsers.add_parser(
+        "fetch-stats",
+        help="네이버 광고 데이터 받아오기 (비동기 보고서, 수십초~수분 소요)",
+    )
+    p_fetch.add_argument(
+        "--days", type=int, default=7,
+        help="지난 N일 데이터 (기본: 7)",
+    )
+    p_fetch.add_argument(
+        "--type", choices=["search", "hourly", "all"], default="search",
+        help="search=검색어 / hourly=시간대 / all=둘 다",
+    )
+    p_fetch.set_defaults(func=cmd_fetch_stats)
+
+    # analyze
+    p_an = subparsers.add_parser(
+        "analyze",
+        help="저장된 데이터로 비효율 검색어 분석 + 부정 키워드 추천",
+    )
+    p_an.add_argument("--sample", action="store_true", help="데모 — 합성 데이터로 시연")
+    p_an.add_argument("--apply", action="store_true", help="추천을 실제 부정 키워드로 등록")
+    p_an.add_argument("--yes", action="store_true", help="--apply 확인 프롬프트 스킵")
+    p_an.add_argument("--since", metavar="YYYY-MM-DD", help="분석 시작 일자")
+    p_an.add_argument("--until", metavar="YYYY-MM-DD", help="분석 종료 일자")
+    p_an.add_argument("--adgroup", metavar="ID", help="특정 광고그룹만")
+    p_an.set_defaults(func=cmd_analyze)
 
     args = parser.parse_args()
     sys.exit(args.func(args))

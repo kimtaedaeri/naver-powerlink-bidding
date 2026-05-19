@@ -27,3 +27,5 @@ Thumbs.db
 *.db
 *.db-journal
 keywords.yaml
+*.bak
+*.tmp
